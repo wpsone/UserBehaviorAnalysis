@@ -4,7 +4,7 @@ import org.apache.flink.cep.{PatternSelectFunction, PatternTimeoutFunction}
 import org.apache.flink.cep.scala.{CEP, PatternStream}
 import org.apache.flink.cep.scala.pattern.Pattern
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
+import org.apache.flink.streaming.api.scala.{DataStream, KeyedStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
 
 import java.net.URL
@@ -22,14 +22,15 @@ object OrderTimeout {
     env.setParallelism(1)
 
     val resource: URL = getClass.getResource("/OrderLog.csv")
-    val orderEventStream: DataStream[OrderEvent] = env.readTextFile(resource.getPath)
+//    val orderEventStream: DataStream[OrderEvent] = env.readTextFile(resource.getPath)
+    val orderEventStream: KeyedStream[OrderEvent, Long] = env.socketTextStream("localhost", 7777)
       .map(data => {
-        val dataArray: Array[String] = data.split(",")
-        OrderEvent(dataArray(0).trim.toLong, dataArray(1).trim, dataArray(2).trim, dataArray(3).trim.toLong
-        )
-      })
-      .assignAscendingTimestamps(_.evenTime * 1000L)
-      .keyBy(_.orderId)
+      val dataArray: Array[String] = data.split(",")
+      OrderEvent(dataArray(0).trim.toLong, dataArray(1).trim, dataArray(2).trim, dataArray(3).trim.toLong
+      )
+    })
+    .assignAscendingTimestamps(_.evenTime * 1000L)
+    .keyBy(_.orderId)
 
     //2.定义一个匹配模式
     val orderPayPattern: Pattern[OrderEvent, OrderEvent] = Pattern.begin[OrderEvent]("begin").where(_.eventType == "create")
